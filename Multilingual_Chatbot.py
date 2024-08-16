@@ -5,8 +5,6 @@ from dotenv import load_dotenv
 import cohere
 from langchain_community.vectorstores import Chroma
 from langchain_cohere import CohereEmbeddings
-from chromadb.utils import embedding_functions
-
 
 # Suppress all warnings of type Warning (superclass of all warnings)
 warnings.filterwarnings("ignore", category=Warning)
@@ -50,6 +48,29 @@ loaded_vectorstore = Chroma(
 )
 # Create a retriever from the loaded vectorstore
 retriever = loaded_vectorstore.as_retriever()
+
+# Load dense embedding of documents
+import pickle
+with open('doc_dense_embeddings.pkl', 'rb') as file:
+    document_embeddings = pickle.load(file)
+
+# Create dense embedding of query
+import numpy as np
+def get_query_embeddings(query):
+    response = cohere_client.embed(texts=[query], model='embed-multilingual-v3.0', input_type='search_query')
+    return np.array(response.embeddings)
+
+# Compute the similarity score between query and documents
+from sklearn.metrics.pairwise import cosine_similarity
+import heapq
+
+def get_similarity_scores(query,number):
+    query_embedding = get_query_embeddings(query)
+    similarity_scores = cosine_similarity(query_embedding, document_embeddings)
+    most_relevant = heapq.nlargest(number, enumerate(similarity_scores[0]), key=lambda x: x[1])
+    _, values = zip(*most_relevant)
+    similarity_scores = values
+    return similarity_scores
 
 ### Router ###
 from langchain_core.prompts import ChatPromptTemplate
@@ -330,6 +351,11 @@ def retrieve(state):
     #    print('--RETRIEVED DOC--')
     #    print(doc.page_content)
     ##print('\n\n')
+    retrieved_doc_num = len(docs)
+
+    # Get similarity scores of first 3 retrieved documents
+    similarity_scores =get_similarity_scores(question, retrieved_doc_num)
+    print('Similarity Scores of Most Relevant Documents: ',similarity_scores)
 
     # Rerank
     formatted_docs = [doc.page_content for doc in docs]
@@ -361,7 +387,7 @@ def llm_fallback(state):
     generation = llm_chain.invoke({"question": question})
     return {"question": question, "generation": generation}
 
-def generate(state):
+def rag(state):
     """
     Generate answer using the vectorstore
 
@@ -452,9 +478,9 @@ def not_related_response(state):
     Returns:
         str: A message indicating that the question is not related to climate change
     """
-
-    #print("Sorry, this question is not related to climate change. Do you have any questions related to the topic?")
-    return {"generation": "Sorry, this question is not related to climate change. Do you have any questions related to the topic?"}
+    question = state["question"]
+    generation = "Sorry, this question is not related to climate change. Do you have any questions related to the topic?"
+    return {"question": question, "generation": generation}
 
 def web_search(state):
     """
@@ -511,15 +537,10 @@ def decide_to_generate(state):
     #print("---ASSESS GRADED DOCUMENTS---")
     filtered_documents = state["documents"]
 
-    if not filtered_documents:
-        # All documents have been filtered check_relevance
-        # We will re-generate a new query
-        #print("---DECISION: ALL DOCUMENTS ARE NOT RELEVANT TO QUESTION, WEB SEARCH---")
-        return "web_search"
+    if filtered_documents and len(filtered_documents)>0:
+        return "rag"
     else:
-        # We have relevant documents, so generate answer
-        #print("---DECISION: GENERATE---")
-        return "generate"
+        return "web_search"
 
 def grade_generation_v_documents_and_question(state):
     """
@@ -561,6 +582,16 @@ def grade_generation_v_documents_and_question(state):
         #pprint.pprint("---DECISION: GENERATION IS NOT GROUNDED IN DOCUMENTS, RE-TRY---")
         return "not supported"
 
+def generate(state):
+    question = state["question"]
+    documents = state["documents"]
+    if not isinstance(documents, list):
+        documents = [documents]
+    generation = state['generation']
+    citations = state['citations']
+
+    return {"documents": documents, "citations":citations, "question": question, "generation": generation}
+
 from langgraph.graph import END, StateGraph
 
 workflow = StateGraph(GraphState)
@@ -569,21 +600,24 @@ workflow = StateGraph(GraphState)
 workflow.add_node("web_search", web_search) # web search
 workflow.add_node("retrieve", retrieve) # retrieve
 workflow.add_node("grade_documents", grade_documents) # grade documents
-workflow.add_node("generate", generate) # rag
+workflow.add_node("rag", rag) # rag
 workflow.add_node("llm_fallback", llm_fallback) # llm
 workflow.add_node("not_related_response", not_related_response) # not related
+workflow.add_node("generate", generate) 
 
 # Build graph
 workflow.set_conditional_entry_point(
     route_question,
     {
-        "web_search": "web_search",
         "retrieve": "retrieve",
         "not_related": "not_related_response",
         "llm_fallback": "llm_fallback",
     },
 )
-workflow.add_edge("web_search", "generate")
+
+workflow.add_edge("llm_fallback", "generate")
+workflow.add_edge("not_related_response", "generate")
+workflow.add_edge("web_search", "rag")
 workflow.add_edge("retrieve", "grade_documents")
 
 workflow.add_conditional_edges(
@@ -591,20 +625,23 @@ workflow.add_conditional_edges(
     decide_to_generate,
     {
         "web_search": "web_search",
-        "generate": "generate",
+        "rag": "rag",
     },
 )
 workflow.add_conditional_edges(
-    "generate",
+    "rag",
     grade_generation_v_documents_and_question,
     {
-        "not supported": "generate", # Hallucinations: re-generate
+        "not supported": "rag", # Hallucinations: re-generate
         "not useful": "web_search", # Fails to answer question: fall-back to web-search
-        "useful": END,
+        "useful": "generate"
     },
 )
-workflow.add_edge("llm_fallback", END)
-workflow.add_edge("not_related_response", END)
+workflow.add_edge("generate", END)
 
 # Compile
 app = workflow.compile()
+
+def run_workflow(input_state):
+    result = app.invoke(input_state)
+    return result

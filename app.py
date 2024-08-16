@@ -1,7 +1,7 @@
 import streamlit as st
 import random
 import time
-from Multilingual_Chatbot import app  
+from Multilingual_Chatbot import run_workflow  
 
 def add_vertical_space(num_lines):
     for _ in range(num_lines):
@@ -28,17 +28,9 @@ def run_chat(question, context):
     response_text = ""
     citations = ""
     try:
-        for output in app.stream(inputs):
-            print('--output--')
-            for key, value in output.items():
-                print('key: ',key)
-                print('value: ',value)
-                if key == "generate":
-                    response_text = value["generation"]
-                    citations = value['citations']
-                    break
-            if response_text:
-                break
+        result = run_workflow(inputs)
+        response_text = result["generation"]
+        citations = result["citations"]
     except Exception as e:
         response_text = str(e)
     return response_text, citations
