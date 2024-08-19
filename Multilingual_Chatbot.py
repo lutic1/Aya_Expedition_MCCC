@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 import cohere
 from langchain_community.vectorstores import Chroma
 from langchain_cohere import CohereEmbeddings
+import sqlite3
 
 # Suppress all warnings of type Warning (superclass of all warnings)
 warnings.filterwarnings("ignore", category=Warning)
