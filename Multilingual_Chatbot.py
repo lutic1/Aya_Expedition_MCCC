@@ -19,8 +19,8 @@ cohere_api_key = os.getenv('COHERE_API_KEY')
 cohere_client = cohere.Client(api_key=cohere_api_key)
 
 # Tracing Optional
-os.environ['LANGCHAIN_TRACING_V2'] = os.getenv('LANGCHAIN_TRACING_V2')
-os.environ['LANGCHAIN_ENDPOINT'] = os.getenv('LANGCHAIN_ENDPOINT')
+#os.environ['LANGCHAIN_TRACING_V2'] = os.getenv('LANGCHAIN_TRACING_V2')
+#os.environ['LANGCHAIN_ENDPOINT'] = os.getenv('LANGCHAIN_ENDPOINT')
 os.environ['LANGCHAIN_API_KEY'] = os.getenv('LANGCHAIN_API_KEY')
 
 # Search
@@ -66,10 +66,9 @@ import heapq
 
 def get_similarity_scores(query,number):
     query_embedding = get_query_embeddings(query)
-    similarity_scores = cosine_similarity(query_embedding, document_embeddings)
-    most_relevant = heapq.nlargest(number, enumerate(similarity_scores[0]), key=lambda x: x[1])
-    _, values = zip(*most_relevant)
-    similarity_scores = values
+    cosine_similarity_scores = cosine_similarity(query_embedding, document_embeddings)
+    most_relevant = heapq.nlargest(number, enumerate(cosine_similarity_scores[0]), key=lambda x: x[1])
+    _ , similarity_scores = zip(*most_relevant)
     return similarity_scores
 
 ### Router ###
