@@ -1,7 +1,7 @@
 import streamlit as st
 import random
 import time
-from Multilingual_Chatbot import run_workflow  
+from Multilingual_Chatbot_Pinecone import run_workflow  
 
 def add_vertical_space(num_lines):
     for _ in range(num_lines):

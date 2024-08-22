@@ -5,7 +5,7 @@ BUILDING **RESILIENT** NEIGHBOURHOODS
 FOUR YEARS OF LEARNINGS
 2012-2016
 
-# Building Resilient Neighbourhoo
+# Building Resilient Neighbourhood
 
 ![1_Image_0.Png](1_Image_0.Png)
 
