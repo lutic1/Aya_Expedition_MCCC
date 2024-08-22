@@ -16,7 +16,7 @@ from pinecone import Pinecone, ServerlessSpec # type: ignore
 import time
 
 # Load environment variables from .env file
-load_dotenv('secrets.env')
+#load_dotenv('secrets.env')
 
 
 # Suppress all warnings of type Warning (superclass of all warnings)
