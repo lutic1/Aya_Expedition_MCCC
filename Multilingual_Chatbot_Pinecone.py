@@ -18,21 +18,23 @@ import time
 # Load environment variables from .env file
 load_dotenv('secrets.env')
 
-# Set up Cohere client and choose model
-os.environ['COHERE_API_KEY'] = os.getenv('COHERE_API_KEY')
-cohere_api_key = os.getenv('COHERE_API_KEY')
-cohere_client = cohere.Client(api_key=cohere_api_key)
 
-# Tracing Optional
-os.environ['LANGCHAIN_TRACING_V2'] = os.getenv('LANGCHAIN_TRACING_V2')
-os.environ['LANGCHAIN_ENDPOINT'] = os.getenv('LANGCHAIN_ENDPOINT')
-os.environ['LANGCHAIN_API_KEY'] = os.getenv('LANGCHAIN_API_KEY')
+# Suppress all warnings of type Warning (superclass of all warnings)
+warnings.filterwarnings("ignore", category=Warning)
+warnings.simplefilter("ignore", LangChainBetaWarning)
+import streamlit as st
 
-# Search
-os.environ['TAVILY_API_KEY'] = os.getenv('TAVILY_API_KEY')
+# Accessing API keys
+COHERE_API_KEY = st.secrets["api_keys"]["cohere_api_key"]
+LANGCHAIN_ENDPOINT  = st.secrets["api_keys"]["langchain_endpoint"]
+LANGCHAIN_API_KEY = st.secrets["api_keys"]["langchain_api_key"]
+TAVILY_API_KEY = st.secrets["api_keys"]["tavily_api_key"]
+pinecone_api_key = st.secrets["api_keys"]["PINECONE_API_KEY"]
+
+# Accessing settings
+LANGCHAIN_TRACING_V2 = st.secrets["settings"]["langchain_tracing_v2"]
 
 # Initialize Pinecone
-pinecone_api_key = os.getenv("PINECONE_API_KEY")
 pinecone_client = Pinecone(api_key=pinecone_api_key)
 index_name = "multilingual-climate-change-adaptation-index"
 spec = ServerlessSpec(cloud='aws', region='us-east1')
